@@ -885,6 +885,7 @@ function renderProyectos(){
         <div onclick="event.stopPropagation()" class="flex-gap">
           <button class="btn btn-ghost btn-xs" onclick="abrirModalProyecto('${p.id}')">✏️</button>
           ${activo?`<button class="btn btn-secondary btn-xs" onclick="cerrarProyecto('${p.id}')">Cerrar obra</button>`:''}
+          <button class="btn btn-danger btn-xs" onclick="eliminarProyecto('${p.id}')" title="Eliminar proyecto">🗑️</button>
         </div>
       </div>
     </div>`;
@@ -900,6 +901,22 @@ function cerrarProyecto(id){
   if(!confirm('¿Cerrar este proyecto? Ya no podrás registrar asistencia nueva.')) return;
   const p = db.proyectos.find(x=>x.id===id);
   p.estado='cerrado'; save(); renderProyectos();
+}
+
+function eliminarProyecto(id){
+  const p = db.proyectos.find(x=>x.id===id);
+  const semC = Object.keys(p.planillas||{}).length;
+  const msg = semC > 0
+    ? `⚠️ Este proyecto tiene ${semC} planilla(s) cerrada(s) con datos reales.\n\nEscribe ELIMINAR para confirmar:`
+    : `¿Eliminar el proyecto "${p.nombre}"? Esta acción no se puede deshacer.`;
+  if(semC > 0){
+    const confirm2 = prompt(msg);
+    if(confirm2 !== 'ELIMINAR') return;
+  } else {
+    if(!confirm(msg)) return;
+  }
+  db.proyectos = db.proyectos.filter(x=>x.id!==id);
+  save(); renderProyectos();
 }
 
 function abrirProyecto(id){
