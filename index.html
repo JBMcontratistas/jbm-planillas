@@ -608,14 +608,20 @@ async function cargarDesdeSheets() {
   if (!SCRIPT_URL) { cargarLocal(); setSyncDot('err','⚠️ Sin configurar'); renderTodo(); return; }
   setSyncDot('loading','⏳ Cargando...');
   try {
-    const res = await fetch(SCRIPT_URL + '?action=read', {cache:'no-store'});
-    const json = await res.json();
+    const res = await fetch(SCRIPT_URL + '?action=read', { redirect: 'follow' });
+    const text = await res.text();
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('respuesta vacía');
+    const json = JSON.parse(match[0]);
     if (json.ok && json.data) {
       db = json.data;
       if (!db.puestos) db.puestos = [];
       localStorage.setItem('jbm-cache', JSON.stringify(db));
       setSyncDot('ok','✅ Sincronizado');
-    } else { throw new Error('sin datos'); }
+    } else if (json.ok && !json.data) {
+      cargarLocal();
+      setSyncDot('ok','✅ Conectado — sin datos aún');
+    } else { throw new Error(json.error || 'sin datos'); }
   } catch(e) {
     cargarLocal();
     setSyncDot('err','📴 Sin conexión — caché');
@@ -640,14 +646,20 @@ async function subirASheets() {
   if (!SCRIPT_URL) return;
   setSyncDot('loading','⬆️ Guardando...');
   try {
+    // Usar POST con form-urlencoded para evitar preflight CORS
+    const body = new URLSearchParams();
+    body.append('action', 'write');
+    body.append('data', JSON.stringify(db));
     const res = await fetch(SCRIPT_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'write', data:db})
+      method: 'POST',
+      redirect: 'follow',
+      body: body
     });
-    const json = await res.json();
+    const text = await res.text();
+    const match = text.match(/\{[\s\S]*\}/);
+    const json = match ? JSON.parse(match[0]) : {ok:false};
     if (json.ok) setSyncDot('ok','✅ ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}));
-    else throw new Error(json.error);
+    else throw new Error(json.error || 'error');
   } catch(e) { setSyncDot('err','❌ Error al guardar'); }
 }
 
@@ -692,8 +704,10 @@ async function probarConexionScript() {
   if (!url) { alert('Ingresa la URL primero.'); return; }
   document.getElementById('config-msg').innerHTML = '<span style="color:rgba(255,255,255,.6)">⏳ Probando...</span>';
   try {
-    const res = await fetch(url + '?action=read');
-    const json = await res.json();
+    const res = await fetch(url + '?action=read', { redirect: 'follow' });
+    const text = await res.text();
+    const match = text.match(/\{[\s\S]*\}/);
+    const json = match ? JSON.parse(match[0]) : {ok:false};
     document.getElementById('config-msg').innerHTML = '<span style="color:#7ddb82">✅ Conexión exitosa. Google Sheets responde correctamente.</span>';
     setSyncDot('ok','✅ Conectado');
     renderConfigEstado();
